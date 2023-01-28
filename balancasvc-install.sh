@@ -3,6 +3,7 @@
 sudo apt-get install -y systemd  
 
 useradd -m dotnetuser -p P@ssw0rd
+cd /root
 
 export DOTNET_ROOT=$(pwd)/.dotnet
 
@@ -27,11 +28,9 @@ cd balancasvc
 
 dotnet publish -o /root/balancasvc/publish
 
-sudo apt-get install -y systemd  
 
 sudo useradd -m dotnetuser -p P@ssw0rd
 
-sudo apt-get install -y systemd
 
 cp balancasvc.service /etc/systemd/system/balancasvc.service
 
