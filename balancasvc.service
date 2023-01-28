@@ -1,0 +1,12 @@
+[Service]
+
+ExecStart=/root/.dotnet/balancasvc/publish/balancasvc
+WorkingDirectory=/root/balancasvc/publish
+User=dotnetuser
+Restart=on-failure
+SyslogIdentifier=dotnet-balanca
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
