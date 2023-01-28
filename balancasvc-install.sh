@@ -21,6 +21,8 @@ tar zxf  dotnet-sdk-6.0.404-linux-arm.tar.gz  -C .dotnet
 
 export PATH=$PATH:/root/.dotnet:root/.dotnet/tools
 
+cd balancasvc
+
 dotnet publish -o /root/balancasvc/publish
 
 sudo useradd -m dotnetuser -p P@ssw0rd
@@ -34,3 +36,5 @@ systemctl enable balancasvc.service
 
 systemctl start balancasvc.service
 
+
+#10.8.11.240 a 248...tem 1 reserva
