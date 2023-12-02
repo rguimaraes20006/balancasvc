@@ -116,7 +116,7 @@ namespace biex.insumos.balancasvc
             _logger.LogDebug($"Dado recebido pela balança");
 
 
-            float med = 0f;
+            float med = -10f;
             SerialPort sp = (SerialPort) sender;
             string indata = sp.ReadExisting();
             _logger.LogInformation(indata);
