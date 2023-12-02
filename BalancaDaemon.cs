@@ -115,7 +115,6 @@ namespace biex.insumos.balancasvc
 
         private async void objPortaSerial_DataReceivedAsync(object sender, SerialDataReceivedEventArgs e)
         {
-            
             float med = 0f;
             SerialPort sp = (SerialPort) sender;
             string indata = sp.ReadExisting();
@@ -144,37 +143,40 @@ namespace biex.insumos.balancasvc
 
         public Task EnviarMedida(MedidaViewmodel medida)
         {
-            
             _logger.LogDebug($"Enviando medida para a API: {medida.Valor} ");
-            
-            var handler = new HttpClientHandler
-            {
-                UseDefaultCredentials = false,
-                Credentials = new NetworkCredential(_auth.Value.Username, _auth.Value.Password, _auth.Value.Domain)
-            };
 
-            using (var client = new HttpClient(handler))
+
+            using (var client = new HttpClient())
             {
                 client.BaseAddress = new Uri(_config.Value.APIUrl);
+
+                //add default headers
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.DefaultRequestHeaders.Add("User-Agent", "BalancaDaemon");
+                //add basic auth
+                client.DefaultRequestHeaders.Add("Authorization",
+                    "Basic " + Convert.ToBase64String(
+                        System.Text.Encoding.ASCII.GetBytes($"{_auth.Value.Username}:{_auth.Value.Password}")));
+
                 var response = client.PostAsJsonAsync("medidas", medida).Result;
-                
+
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation(($"Medida enviada com sucesso para a API: {medida.Valor}"));
                 }
                 else
                 {
-                    _logger.LogError($"Não foi possível enviar a medida para a API: {medida.Valor} erro: {response.StatusCode}  ");
+                    _logger.LogError(
+                        $"Não foi possível enviar a medida para a API: {medida.Valor} erro: {response.StatusCode}  ");
                 }
             }
-            
+
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
             objPortaSerial.Close();
-
             _logger.LogInformation("Parando daemon.");
             return Task.CompletedTask;
         }
