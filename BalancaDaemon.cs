@@ -1,5 +1,8 @@
 ﻿using System;
 using System.IO.Ports;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,7 +10,6 @@ using balancasvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using RestSharp;
 
 namespace biex.insumos.balancasvc
 {
@@ -142,34 +144,30 @@ namespace biex.insumos.balancasvc
 
         public Task EnviarMedida(MedidaViewmodel medida)
         {
-            var client = new RestClient(_config.Value.APIUrl);
-
-            client.Authenticator =
-                new RestSharp.Authenticators.NtlmAuthenticator($"{_auth.Value.Username}", _auth.Value.Password);
-
-            var request = new RestRequest("medida/", Method.POST);
-            request.RequestFormat = DataFormat.Json;
-
-            var body = new MedidaViewmodel
+            
+            _logger.LogDebug($"Enviando medida para a API: {medida.Valor} ");
+            
+            var handler = new HttpClientHandler
             {
-                DataMedicao = medida.DataMedicao,
-                id_balanca = medida.id_balanca,
-                Valor = medida.Valor
+                UseDefaultCredentials = false,
+                Credentials = new NetworkCredential(_auth.Value.Username, _auth.Value.Password, _auth.Value.Domain)
             };
 
-            request.AddJsonBody(body);
-
-            var result = client.Execute(request);
-
-            if ( !result.IsSuccessful)
+            using (var client = new HttpClient(handler))
             {
-                _logger.LogError($"A resposta do serviço foi: {result.StatusCode} - {result.StatusDescription} ");
+                client.BaseAddress = new Uri(_config.Value.APIUrl);
+                var response = client.PostAsJsonAsync("medidas", medida).Result;
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation(($"Medida enviada com sucesso para a API: {medida.Valor}"));
+                }
+                else
+                {
+                    _logger.LogError($"Não foi possível enviar a medida para a API: {medida.Valor} erro: {response.StatusCode}  ");
+                }
             }
-            else
-            {
-                _logger.LogInformation($"Medida enviada com sucesso: {medida.Valor} ");
-            }
-
+            
             return Task.CompletedTask;
         }
 
