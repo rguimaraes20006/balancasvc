@@ -109,17 +109,14 @@ namespace biex.insumos.balancasvc
             }, cancellationToken);
         }
 
-        float med_atual = 0f;
+        float med_atual = -10f;
 
         private async void objPortaSerial_DataReceivedAsync(object sender, SerialDataReceivedEventArgs e)
         {
-            _logger.LogDebug($"Dado recebido pela balança");
-
-
-            float med = -10f;
+            
+            float med = 0f;
             SerialPort sp = (SerialPort) sender;
             string indata = sp.ReadExisting();
-            _logger.LogInformation(indata);
 
             //obtém a medida
             try
@@ -129,7 +126,7 @@ namespace biex.insumos.balancasvc
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Não foi possível obter a medida do valor : {indata} erro {ex.Message} ");
+                _logger.LogError($"Não foi possível obter a medida do valor : {indata} erro {ex.Message} ");
             }
 
             if (med != med_atual)
@@ -164,10 +161,13 @@ namespace biex.insumos.balancasvc
 
             var result = client.Execute(request);
 
-            if (result.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
-                result.StatusCode == System.Net.HttpStatusCode.InternalServerError)
+            if ( !result.IsSuccessful)
             {
-                _logger.LogWarning($"A resposta do serviço foi: {result.StatusCode} - {result.StatusDescription} ");
+                _logger.LogError($"A resposta do serviço foi: {result.StatusCode} - {result.StatusDescription} ");
+            }
+            else
+            {
+                _logger.LogInformation($"Medida enviada com sucesso: {medida.Valor} ");
             }
 
             return Task.CompletedTask;
