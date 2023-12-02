@@ -146,7 +146,13 @@ namespace biex.insumos.balancasvc
             _logger.LogDebug($"Enviando medida para a API: {medida.Valor} ");
 
 
-            using (var client = new HttpClient())
+            var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
+            };
+            
+            
+            using (var client = new HttpClient(handler))
             {
                 client.BaseAddress = new Uri(_config.Value.APIUrl);
 
@@ -158,7 +164,7 @@ namespace biex.insumos.balancasvc
                     "Basic " + Convert.ToBase64String(
                         System.Text.Encoding.ASCII.GetBytes($"{_auth.Value.Username}:{_auth.Value.Password}")));
 
-                var response = client.PostAsJsonAsync("medidas", medida).Result;
+                var response = client.PostAsJsonAsync("medida", medida).Result;
 
                 if (response.IsSuccessStatusCode)
                 {
