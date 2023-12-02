@@ -11,7 +11,6 @@ using RestSharp;
 
 namespace biex.insumos.balancasvc
 {
-
     public class BalancaDaemon : IHostedService, IDisposable
     {
         private readonly ILogger _logger;
@@ -22,8 +21,8 @@ namespace biex.insumos.balancasvc
         private Task _asyncTask;
 
 
-
-        public BalancaDaemon(ILogger<BalancaDaemon> logger, IOptions<BalancaDaemonConfig> config, IOptions<BalancaDaemonAuthentication> auth)
+        public BalancaDaemon(ILogger<BalancaDaemon> logger, IOptions<BalancaDaemonConfig> config,
+            IOptions<BalancaDaemonAuthentication> auth)
         {
             _logger = logger;
             _config = config;
@@ -51,7 +50,8 @@ namespace biex.insumos.balancasvc
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation($"Inicializando daemon balança: {_config.Value.id_balanca} porta: {_config.Value.Porta} API: {_config.Value.APIUrl} ModoTeste: {_config.Value.ModoTeste} ");
+            _logger.LogInformation(
+                $"Inicializando daemon balança: {_config.Value.id_balanca} porta: {_config.Value.Porta} API: {_config.Value.APIUrl} ModoTeste: {_config.Value.ModoTeste} ");
 
             if (_config.Value.ModoTeste)
             {
@@ -60,8 +60,8 @@ namespace biex.insumos.balancasvc
             }
 
             _logger.LogInformation("Instanciando a porta serial");
-                
-            objPortaSerial = new SerialPort(_config.Value.Porta, 9600, Parity.None , 8, StopBits.One);
+
+            objPortaSerial = new SerialPort(_config.Value.Porta, 9600, Parity.None, 8, StopBits.One);
             objPortaSerial.DataReceived += objPortaSerial_DataReceivedAsync;
 
 
@@ -85,6 +85,11 @@ namespace biex.insumos.balancasvc
 
             _asyncTask = CarregaMedidaBalanca(cancellationToken);
 
+            while (cancellationToken.IsCancellationRequested == false)
+            {
+                Task.Delay(_config.Value.RefreshRate, cancellationToken);
+            }
+
             return Task.CompletedTask;
         }
 
@@ -92,22 +97,16 @@ namespace biex.insumos.balancasvc
         {
             _logger.LogDebug($"Chamou carga medida balanca");
 
-            while (cancellationToken.IsCancellationRequested == false)
+            //enviar o comando SI 
+            await Task.Run(() =>
             {
-                await Task.Run(() =>
-                {
-                     _logger.LogDebug($"Enviando comando SI para a balança");
+                _logger.LogDebug($"Enviando comando SI para a balança");
 
-                    String command = "SI" + Environment.NewLine;
-                    byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
-                    objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
-                     _logger.LogDebug($"Comando SI enviado");
-
-                }, cancellationToken);
-
-                await Task.Delay(_config.Value.RefreshRate, cancellationToken);
-
-            }
+                String command = "SI" + Environment.NewLine;
+                byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
+                objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
+                _logger.LogDebug($"Comando SI enviado");
+            }, cancellationToken);
         }
 
         float med_atual = 0f;
@@ -118,7 +117,7 @@ namespace biex.insumos.balancasvc
 
 
             float med = 0f;
-            SerialPort sp = (SerialPort)sender;
+            SerialPort sp = (SerialPort) sender;
             string indata = sp.ReadExisting();
             _logger.LogInformation(indata);
 
@@ -130,12 +129,11 @@ namespace biex.insumos.balancasvc
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Não foi possível obter a medida do valor : {indata} erro {ex.Message} " );
+                _logger.LogWarning($"Não foi possível obter a medida do valor : {indata} erro {ex.Message} ");
             }
 
             if (med != med_atual)
             {
-
                 //envia a medida para a API
                 MedidaViewmodel medida = new MedidaViewmodel();
                 medida.DataMedicao = DateTime.Now;
@@ -149,7 +147,8 @@ namespace biex.insumos.balancasvc
         {
             var client = new RestClient(_config.Value.APIUrl);
 
-            client.Authenticator = new RestSharp.Authenticators.NtlmAuthenticator($"{_auth.Value.Username}", _auth.Value.Password);
+            client.Authenticator =
+                new RestSharp.Authenticators.NtlmAuthenticator($"{_auth.Value.Username}", _auth.Value.Password);
 
             var request = new RestRequest("medida/", Method.POST);
             request.RequestFormat = DataFormat.Json;
@@ -165,7 +164,8 @@ namespace biex.insumos.balancasvc
 
             var result = client.Execute(request);
 
-            if (result.StatusCode == System.Net.HttpStatusCode.Unauthorized || result.StatusCode ==  System.Net.HttpStatusCode.InternalServerError)
+            if (result.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                result.StatusCode == System.Net.HttpStatusCode.InternalServerError)
             {
                 _logger.LogWarning($"A resposta do serviço foi: {result.StatusCode} - {result.StatusDescription} ");
             }
