@@ -85,33 +85,18 @@ namespace biex.insumos.balancasvc
                 }
             }
 
-            _asyncTask = CarregaMedidaBalanca(cancellationToken);
-
-            while (cancellationToken.IsCancellationRequested == false)
-            {
-                Task.Delay(_config.Value.RefreshRate, cancellationToken);
-            }
+            //envia o SI para a balança
+            _logger.LogDebug($"Enviando comando SI para a balança");
+            String command = "SI" + Environment.NewLine;
+            byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
+            objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
+            _logger.LogDebug($"Comando SI enviado");
 
             return Task.CompletedTask;
         }
 
-        private async Task CarregaMedidaBalanca(CancellationToken cancellationToken)
-        {
-            _logger.LogDebug($"Chamou carga medida balanca");
 
-            //enviar o comando SI 
-            await Task.Run(() =>
-            {
-                _logger.LogDebug($"Enviando comando SI para a balança");
-
-                String command = "SI" + Environment.NewLine;
-                byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
-                objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
-                _logger.LogDebug($"Comando SI enviado");
-            }, cancellationToken);
-        }
-
-        float med_atual = -10f;
+        float med_atual = 0f;
 
         private async void objPortaSerial_DataReceivedAsync(object sender, SerialDataReceivedEventArgs e)
         {
@@ -132,11 +117,15 @@ namespace biex.insumos.balancasvc
 
             if (med != med_atual)
             {
+                _logger.LogInformation($"Medida recebida: {med} é diferente da ultima {med_atual}");
+
                 //envia a medida para a API
                 MedidaViewmodel medida = new MedidaViewmodel();
                 medida.DataMedicao = DateTime.Now;
                 medida.id_balanca = _config.Value.id_balanca;
                 medida.Valor = med;
+
+                med_atual = med;
                 await EnviarMedida(medida);
             }
         }
@@ -150,8 +139,8 @@ namespace biex.insumos.balancasvc
             {
                 ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
             };
-            
-            
+
+
             using (var client = new HttpClient(handler))
             {
                 client.BaseAddress = new Uri(_config.Value.APIUrl);
