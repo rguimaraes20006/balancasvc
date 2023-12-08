@@ -20,8 +20,6 @@ namespace biex.insumos.balancasvc
         private readonly IOptions<BalancaDaemonAuthentication> _auth;
 
         public SerialPort objPortaSerial;
-        private Task _asyncTask;
-
 
         public BalancaDaemon(ILogger<BalancaDaemon> logger, IOptions<BalancaDaemonConfig> config,
             IOptions<BalancaDaemonAuthentication> auth)
@@ -86,11 +84,11 @@ namespace biex.insumos.balancasvc
             }
 
             //envia o SI para a balança
-            _logger.LogDebug($"Enviando comando SI para a balança");
+            _logger.LogInformation($"Enviando comando SI para a balança");
             String command = "SI" + Environment.NewLine;
             byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
             objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
-            _logger.LogDebug($"Comando SI enviado");
+            _logger.LogInformation($"Comando SI enviado");
 
             return Task.CompletedTask;
         }
@@ -127,6 +125,10 @@ namespace biex.insumos.balancasvc
 
                 med_atual = med;
                 await EnviarMedida(medida);
+            }
+            else
+            {
+                _logger.LogDebug($"Medida recebida: {med} é igual a ultima {med_atual}");
             }
         }
 
