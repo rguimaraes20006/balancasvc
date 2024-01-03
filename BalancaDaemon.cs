@@ -48,7 +48,6 @@ namespace biex.insumos.balancasvc
             return Task.CompletedTask;
         }
 
-
         private Task ProcessAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Instanciando a porta serial");
@@ -88,14 +87,7 @@ namespace biex.insumos.balancasvc
             byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
             objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
             _logger.LogInformation("Comando SI enviado");
-            
-            
-            //aguarda o cancelamento
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                Thread.Sleep(_config.Value.RefreshRate);
-            }
-            
+      
             return Task.CompletedTask;
         }
 
@@ -150,7 +142,7 @@ namespace biex.insumos.balancasvc
                 medida.Valor = med;
 
                 _medAtual = med;
-                await EnviarMedida(medida);
+                EnviarMedida(medida);
             }
             else
             {
@@ -172,6 +164,9 @@ namespace biex.insumos.balancasvc
             {
                 client.BaseAddress = new Uri(_config.Value.APIUrl);
 
+                _logger.LogInformation( "Url do post: {UrlPost}", client.BaseAddress);
+                
+                
                 //add default headers
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
                 client.DefaultRequestHeaders.Add("User-Agent", "BalancaDaemon");
