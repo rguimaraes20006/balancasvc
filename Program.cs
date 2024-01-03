@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,11 @@ namespace biex.insumos.balancasvc
                  logging.AddConsole();
              });
 
+            Console.CancelKeyPress += (sender, eventArgs) =>
+            {
+                Console.WriteLine("Cancelando o serviço");
+                eventArgs.Cancel = true;
+            };
             await builder.RunConsoleAsync();
         }
     }

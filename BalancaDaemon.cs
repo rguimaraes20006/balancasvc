@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO.Ports;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -19,7 +21,7 @@ namespace biex.insumos.balancasvc
         private readonly IOptions<BalancaDaemonConfig> _config;
         private readonly IOptions<BalancaDaemonAuthentication> _auth;
 
-        public SerialPort objPortaSerial;
+        // public SerialPort objPortaSerial;
 
         public BalancaDaemon(ILogger<BalancaDaemon> logger, IOptions<BalancaDaemonConfig> config,
             IOptions<BalancaDaemonAuthentication> auth)
@@ -48,32 +50,36 @@ namespace biex.insumos.balancasvc
             return Task.CompletedTask;
         }
 
-        private Task ProcessAsync(CancellationToken cancellationToken)
+        private  Task ProcessSerialRealtime(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Instanciando a porta serial");
-            
-            objPortaSerial = new SerialPort(_config.Value.Porta, 9600, Parity.None, 8, StopBits.One);
-            objPortaSerial.DataReceived += objPortaSerial_DataReceivedAsync;
 
-            //caso não conecte na balança ele tenta novamente após alguns segundos 
+            var objBalanca = new SerialPort(_config.Value.Porta, 9600, Parity.None, 8, StopBits.One);
+            //conexão com a balança
             int qtdTentativas = 0;
-            while (cancellationToken.IsCancellationRequested == false && !objPortaSerial.IsOpen)
+            while (cancellationToken.IsCancellationRequested == false && !objBalanca.IsOpen)
             {
-                if(qtdTentativas > 3) {
+                if (qtdTentativas > 3)
+                {
                     _logger.LogError("Não foi possível conectar a balança. Saindo do daemon");
                     break;
                 }
-                
+
                 try
                 {
                     _logger.LogInformation("Tentando abrir a porta serial");
                     //tenta abrir a porta 
-                    objPortaSerial.Open();
-                    _logger.LogInformation("Porta aberta conectado a balança");
+                    objBalanca.Open();
+                    _logger.LogInformation("Porta aberta conectado a balança enviando comando SI");
+                    String command = "SI" + Environment.NewLine;
+                    byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
+                    objBalanca.Write(asciiByte, 0, asciiByte.Length);
+                    _logger.LogInformation("Comando SI enviado");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogDebug("Não conectado a balança. Tentando novamente em 10s Erro: {ExMessage}", ex.Message);
+                    _logger.LogDebug("Não conectado a balança. Tentando novamente em 10s Erro: {ExMessage}",
+                        ex.Message);
                     //aguarda 10 segundos
                     Thread.Sleep(10000);
                 }
@@ -81,20 +87,59 @@ namespace biex.insumos.balancasvc
                 qtdTentativas++;
             }
 
-            //envia o SI para a balança
-            _logger.LogInformation("Enviando comando SI para a balança");
-            String command = "SI" + Environment.NewLine;
-            byte[] asciiByte = System.Text.Encoding.ASCII.GetBytes(command);
-            objPortaSerial.Write(asciiByte, 0, asciiByte.Length);
-            _logger.LogInformation("Comando SI enviado");
-      
+
+            float _medAtual = 0f;
+            
+            //loop infinito enquanto n rolar o ctrl+c e a balança estiver aberta
+            while (cancellationToken.IsCancellationRequested == false && objBalanca.IsOpen)
+            {
+                //obtendo a medida atual da balança
+                var arrMedidas = objBalanca.ReadExisting().Split('\n');
+                var ultimaLinha = arrMedidas[arrMedidas.Length - 2];
+                
+                
+                float med = 0f;
+
+                //obtém a medida
+                try
+                {
+                    var match = Regex.Match(ultimaLinha, @"([-+]?[0-9]*\.?[0-9]+)");
+                    med = float.Parse(match.Groups[1].Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Não foi possível obter a medida do valor : {Indata} erro {ExMessage} ", ultimaLinha, ex.Message);
+                }
+
+                if (med != _medAtual)
+                {
+                    _logger.LogInformation("Medida recebida: {Med} é diferente da ultima {MedAtual}", med, _medAtual);
+                    
+                    //envia a medida para a API
+                    MedidaViewmodel medida = new MedidaViewmodel();
+                    medida.DataMedicao = DateTime.Now;
+                    medida.id_balanca = _config.Value.id_balanca;
+                    medida.Valor = med;
+                    _medAtual = med;
+                    EnviarMedida(medida);
+                }
+                else
+                {
+                    _logger.LogDebug("Medida recebida: {Med} é igual a ultima {MedAtual}", med, _medAtual);
+                }
+                
+                Thread.Sleep(_config.Value.RefreshRate);
+                
+            }
+            
             return Task.CompletedTask;
         }
 
-
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Inicializando daemon balança: {ValueIdBalanca} porta: {ValuePorta} API: {ValueApiUrl} ModoTeste: {ValueModoTeste} ", _config.Value.id_balanca, _config.Value.Porta, _config.Value.APIUrl, _config.Value.ModoTeste);
+            _logger.LogInformation(
+                "Inicializando daemon balança: {ValueIdBalanca} porta: {ValuePorta} API: {ValueApiUrl} ModoTeste: {ValueModoTeste} ",
+                _config.Value.id_balanca, _config.Value.Porta, _config.Value.APIUrl, _config.Value.ModoTeste);
 
             if (_config.Value.ModoTeste)
             {
@@ -103,16 +148,14 @@ namespace biex.insumos.balancasvc
             }
             else
             {
-                ProcessAsync(cancellationToken);
+                ProcessSerialRealtime(cancellationToken);
                 return Task.CompletedTask;
             }
-
-            
         }
 
 
-        float _medAtual = 0f;
 
+        /*
         private async void objPortaSerial_DataReceivedAsync(object sender, SerialDataReceivedEventArgs e)
         {
             float med = 0f;
@@ -149,6 +192,7 @@ namespace biex.insumos.balancasvc
                 _logger.LogDebug("Medida recebida: {Med} é igual a ultima {MedAtual}", med, _medAtual);
             }
         }
+        */
 
         private Task EnviarMedida(MedidaViewmodel medida)
         {
@@ -164,9 +208,9 @@ namespace biex.insumos.balancasvc
             {
                 client.BaseAddress = new Uri(_config.Value.APIUrl);
 
-                _logger.LogInformation( "Url do post: {UrlPost}", client.BaseAddress);
-                
-                
+                _logger.LogInformation("Url do post: {UrlPost}", client.BaseAddress);
+
+
                 //add default headers
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
                 client.DefaultRequestHeaders.Add("User-Agent", "BalancaDaemon");
@@ -183,7 +227,9 @@ namespace biex.insumos.balancasvc
                 }
                 else
                 {
-                    _logger.LogError("Não foi possível enviar a medida para a API: {MedidaValor} erro: {ResponseStatusCode}  ", medida.Valor, response.StatusCode);
+                    _logger.LogError(
+                        "Não foi possível enviar a medida para a API: {MedidaValor} erro: {ResponseStatusCode}  ",
+                        medida.Valor, response.StatusCode);
                 }
             }
 
@@ -192,10 +238,11 @@ namespace biex.insumos.balancasvc
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            objPortaSerial.Close();
+          // objPortaSerial.Close();
             _logger.LogInformation("Parando daemon.");
             return Task.CompletedTask;
         }
+
 
         public void Dispose()
         {
