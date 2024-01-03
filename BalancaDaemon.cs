@@ -50,7 +50,7 @@ namespace biex.insumos.balancasvc
             return Task.CompletedTask;
         }
 
-        private  Task ProcessSerialRealtime(CancellationToken cancellationToken)
+        private Task ProcessSerialRealtime(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Instanciando a porta serial");
 
@@ -141,6 +141,8 @@ namespace biex.insumos.balancasvc
                 "Inicializando daemon balança: {ValueIdBalanca} porta: {ValuePorta} API: {ValueApiUrl} ModoTeste: {ValueModoTeste} ",
                 _config.Value.id_balanca, _config.Value.Porta, _config.Value.APIUrl, _config.Value.ModoTeste);
 
+            
+            
             if (_config.Value.ModoTeste)
             {
                 TestAsync(cancellationToken);
@@ -148,51 +150,12 @@ namespace biex.insumos.balancasvc
             }
             else
             {
-                ProcessSerialRealtime(cancellationToken);
+                //Start ProcessSerialRealtime in a new thread
+                Task.Run(() => ProcessSerialRealtime(cancellationToken));
                 return Task.CompletedTask;
             }
         }
 
-
-
-        /*
-        private async void objPortaSerial_DataReceivedAsync(object sender, SerialDataReceivedEventArgs e)
-        {
-            float med = 0f;
-            SerialPort sp = (SerialPort) sender;
-            string indata = sp.ReadExisting();
-
-            
-            //obtém a medida
-            try
-            {
-                var match = Regex.Match(indata, @"([-+]?[0-9]*\.?[0-9]+)");
-                med = float.Parse(match.Groups[1].Value);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Não foi possível obter a medida do valor : {Indata} erro {ExMessage} ", indata, ex.Message);
-            }
-
-            if (med != _medAtual)
-            {
-                _logger.LogInformation("Medida recebida: {Med} é diferente da ultima {MedAtual}", med, _medAtual);
-
-                //envia a medida para a API
-                MedidaViewmodel medida = new MedidaViewmodel();
-                medida.DataMedicao = DateTime.Now;
-                medida.id_balanca = _config.Value.id_balanca;
-                medida.Valor = med;
-
-                _medAtual = med;
-                EnviarMedida(medida);
-            }
-            else
-            {
-                _logger.LogDebug("Medida recebida: {Med} é igual a ultima {MedAtual}", med, _medAtual);
-            }
-        }
-        */
 
         private Task EnviarMedida(MedidaViewmodel medida)
         {
