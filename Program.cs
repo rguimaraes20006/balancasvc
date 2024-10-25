@@ -23,8 +23,10 @@ namespace biex.insumos.balancasvc
                 services.AddOptions();
                 services.Configure<BalancaDaemonConfig>(hostContext.Configuration.GetSection("Servico"));
                 services.Configure<BalancaDaemonAuthentication>(hostContext.Configuration.GetSection("Autenticacao"));                
-                services.AddSingleton<IHostedService, BalancaDaemon>();
-
+                //services.AddSingleton<IHostedService, BalancaDaemon>();
+                services.AddSingleton<IHostedService, BalancaPoolingDaemon>();
+                
+                    
             }).ConfigureLogging((hostingContext, logging) =>
              {
                  logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
