@@ -17,27 +17,25 @@ namespace biex.insumos.balancasvc
             {
                 config.SetBasePath(Directory.GetCurrentDirectory());
                 config.AddJsonFile("appsettings.json", false, true);
-
             }).ConfigureServices((hostContext, services) =>
             {
                 services.AddOptions();
                 services.Configure<BalancaDaemonConfig>(hostContext.Configuration.GetSection("Servico"));
-                services.Configure<BalancaDaemonAuthentication>(hostContext.Configuration.GetSection("Autenticacao"));                
-                //services.AddSingleton<IHostedService, BalancaDaemon>();
-                services.AddSingleton<IHostedService, BalancaPoolingDaemon>();
-                
-                    
-            }).ConfigureLogging((hostingContext, logging) =>
-             {
-                 logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
-                 logging.AddConsole();
-             });
+                services.Configure<BalancaDaemonAuthentication>(hostContext.Configuration.GetSection("Autenticacao"));
+                services.AddHostedService<BalancaPoolingDaemon>();
 
+            }).ConfigureLogging((hostingContext, logging) =>
+            {
+                logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
+                logging.AddConsole();
+            });
+
+            //force process end when CTRL+C is pressed
             Console.CancelKeyPress += (sender, eventArgs) =>
             {
-                Console.WriteLine("Cancelando o serviço");
                 eventArgs.Cancel = true;
             };
+            
             await builder.RunConsoleAsync();
         }
     }
