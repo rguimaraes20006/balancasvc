@@ -76,13 +76,14 @@ namespace biex.insumos.balancasvc
                 var arrMedidas = buffer.Split('\n');
                 var ultimaLinha = arrMedidas[arrMedidas.Length - 2];
 
+                _logger.LogInformation("Medida obtida: {Medida}", buffer);
                 float med = 0f;
 
                 //obtém a medida
                 try
                 {
                     var match = Regex.Match(ultimaLinha, @"([-+]?[0-9]*\.?[0-9]+)");
-                    med = float.Parse(match.Groups[1].Value);
+                    med = float.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
                 }
                 catch (Exception ex)
                 {
